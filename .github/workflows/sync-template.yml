@@ -28,16 +28,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get GitHub App token
-        uses: tibdex/github-app-token@v1.7.0
-        id: get_installation_token
-        with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+      # - name: Get GitHub App token
+      #   uses: tibdex/github-app-token@v1.7.0
+      #   id: get_installation_token
+      #   with:
+      #     app_id: ${{ secrets.APP_ID }}
+      #     private_key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Sync branch to template
         env:
-          GH_TOKEN: ${{ steps.get_installation_token.outputs.token }}
+          #GH_TOKEN: ${{ steps.get_installation_token.outputs.token }}
           WHITELIST_FILES: ".github/workflows/build.yml,tsconfig.json"
           ADDITIONAL_FILES: ${{ github.event.inputs.additional_files }}
         run: |
