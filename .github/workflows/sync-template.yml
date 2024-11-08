@@ -65,9 +65,15 @@ jobs:
             cp -f "template-repo/$file" "$file"
           done
 
+          # Prepare a formatted file list for the PR body
+          file_list=""
+          for file in $WHITELIST_FILES "${additional_files[@]}"; do
+            file_list+="\n- \`${file}\`"
+          done
+
           # Clean up
           rm -rf template-repo/
           git add .
           git commit -m "chore: sync template"
           git push "$original_remote" "$pr_branch"
-          gh pr create --title "Sync branch to template" --body "This pull request merges changes from the template repository, overwriting only files in the whitelist and specified files." --head "$pr_branch" --base "$branch_name"
+          gh pr create --title "Sync branch to template" --body "This pull request merges changes from the template repository, overwriting the following files:${file_list}" --head "$pr_branch" --base "$branch_name"
