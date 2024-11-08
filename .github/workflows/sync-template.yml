@@ -1,0 +1,79 @@
+name: Sync branch to template
+
+on:
+  workflow_dispatch:
+    inputs:
+      additional_files:
+        description: 'Comma-separated list of additional files to sync (i.e ".github/workflows/build.yml tsconfig.json")'
+        required: false
+  schedule:
+    - cron: '14 0 1 * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check if repository is ts-template
+        run: |
+          if [[ "${{ github.repository }}" == "ubiquity/ts-template" ]]; then
+            echo "Skipping sync: this is the template repository."
+            exit 0
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get GitHub App token
+        uses: tibdex/github-app-token@v1.7.0
+        id: get_installation_token
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Sync branch to template
+        env:
+          GH_TOKEN: ${{ steps.get_installation_token.outputs.token }}
+          WHITELIST_FILES: ".github/workflows/build.yml,tsconfig.json"
+          ADDITIONAL_FILES: ${{ github.event.inputs.additional_files }}
+        run: |
+          branch_name=$(git rev-parse --abbrev-ref HEAD)
+          original_remote=$(git remote get-url origin)
+          pr_branch="sync-template/${branch_name}"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git checkout -b "$pr_branch"
+          git clone https://github.com/ubiquity/ts-template template-repo
+
+          # Convert ADDITIONAL_FILES input to an array
+          additional_files=""
+          if [[ -n "$ADDITIONAL_FILES" ]]; then
+            IFS=',' read -r -a additional_files <<< "$ADDITIONAL_FILES"
+          fi
+
+          # Copy whitelist files from template
+          for file in $WHITELIST_FILES; do
+            cp -f "template-repo/$file" "$file"
+          done
+
+          # Copy additional files from template (if any were specified)
+          for file in "${additional_files[@]}"; do
+            cp -f "template-repo/$file" "$file"
+          done
+
+          # Prepare a formatted file list for the PR body
+          file_list=""
+          for file in $WHITELIST_FILES "${additional_files[@]}"; do
+            file_list+="\n- \`${file}\`"
+          done
+
+          # Clean up
+          rm -rf template-repo/
+          git add .
+          git commit -m "chore: sync template"
+          git push "$original_remote" "$pr_branch"
+          gh pr create --title "Sync branch to template" --body "This pull request merges changes from the template repository, overwriting the following files:${file_list}" --head "$pr_branch" --base "$branch_name"
