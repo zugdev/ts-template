@@ -14,8 +14,8 @@ This is not required but again, it is advised.
 
 // EXAMPLE
 Changes:
-- I've refactored the authentication mechanism because the auth token wasn't being properly stored.
-- I've removed unnecessary calls to render the login button.
+- Refactored the authentication mechanism because the auth token wasn't being properly stored.
+- Removed unnecessary calls to render the login button.
 -->
 
 Changes:
