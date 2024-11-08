@@ -47,7 +47,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git checkout -b "$pr_branch"
-          git clone https://github.com/ubiquity/ts-template template-repo
+          git clone https://github.com/zugdev/ts-template template-repo
 
           # Convert ADDITIONAL_FILES input to an array
           additional_files=""
