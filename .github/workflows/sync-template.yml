@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       additional_files:
-        description: 'Comma-separated list of additional files to sync (i.e ".github/workflows/build.yml tsconfig.json")'
+        description: 'Comma-separated list of extra paths to sync, for example: .eslintrc,.prettierrc,.github'
         required: false
   schedule:
     - cron: '14 0 1 * *'
