@@ -38,3 +38,14 @@ QA:
 QA:
 
 - ...
+
+<!---
+Please provide:
+1. Detailed instructions how to QA locally the PR
+2. Setup instructions required after the PR is merged
+
+Example: https://github.com/ubiquity/pay.ubq.fi/pull/226#issue-2290493538
+-->
+
+How to QA and setup:
+- ...
