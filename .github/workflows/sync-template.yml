@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       additional_files:
-        description: 'Comma-separated list of additional files to sync (i.e ".github/workflows/build.yml tsconfig.json")'
+        description: 'Comma-separated list of extra paths to sync, for example: .eslintrc,.prettierrc,.github'
         required: false
   schedule:
     - cron: '14 0 1 * *'
@@ -38,7 +38,7 @@ jobs:
       - name: Sync branch to template
         env:
           GH_TOKEN: ${{ steps.get_installation_token.outputs.token }}
-          WHITELIST_FILES: ".github/workflows/build.yml,tsconfig.json"
+          WHITELIST_FILES: ".github/workflows/sync-template.yml .github/workflows/build.yml .github/workflows/conventional-commits.yml .github/workflows/cspell.yml .github/workflows/cypress-testing.yml .github/workflows/knip-reporter.yml .github/workflows/knip.yml .github/workflows/no-empty-strings.yml .github/workflows/release-please.yml .github/pull_request_template.md .husky/ .eslintrc .nvmrc .prettierrc .yarnrc.yml tsconfig.json"
           ADDITIONAL_FILES: ${{ github.event.inputs.additional_files }}
         run: |
           branch_name=$(git rev-parse --abbrev-ref HEAD)
@@ -46,34 +46,48 @@ jobs:
           pr_branch="sync-template/${branch_name}"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git checkout -b "$pr_branch"
+          
+          # Check if the sync branch already exists
+          if git ls-remote --exit-code --heads origin "$pr_branch"; then
+            echo "Branch $pr_branch already exists. Fetching and updating."
+            git fetch origin "$pr_branch"
+            git checkout "$pr_branch"
+            git rebase "origin/$pr_branch"
+          else
+            echo "Creating new branch $pr_branch."
+            git checkout -b "$pr_branch"
+          fi
+
           git clone https://github.com/ubiquity/ts-template template-repo
 
           # Convert ADDITIONAL_FILES input to an array
-          additional_files=""
+          additional_files=()
           if [[ -n "$ADDITIONAL_FILES" ]]; then
             IFS=',' read -r -a additional_files <<< "$ADDITIONAL_FILES"
           fi
 
-          # Copy whitelist files from template
-          for file in $WHITELIST_FILES; do
-            cp -f "template-repo/$file" "$file"
-          done
-
-          # Copy additional files from template (if any were specified)
-          for file in "${additional_files[@]}"; do
-            cp -f "template-repo/$file" "$file"
-          done
-
-          # Prepare a formatted file list for the PR body
+          # Prepare file list for the PR body and process each whitelist file
           file_list=""
           for file in $WHITELIST_FILES "${additional_files[@]}"; do
-            file_list+="\n- \`${file}\`"
+            if [[ -e "template-repo/$file" ]]; then
+              cp -rf "template-repo/$file" "$file"
+              file_list+="\n- \`${file}\`"
+            else
+              # Remove file from destination if not in template
+              rm -rf "$file"
+              file_list+="\n- \`${file}\` (removed)"
+            fi
           done
 
           # Clean up
           rm -rf template-repo/
+
+          # Commit
           git add .
           git commit -m "chore: sync template"
+          
+          # Push
           git push "$original_remote" "$pr_branch"
-          gh pr create --title "Sync branch to template" --body "This pull request merges changes from the template repository, overwriting the following files:${file_list}" --head "$pr_branch" --base "$branch_name"
+
+          # Create PR
+          gh pr create --title "Sync branch to template" --body "This pull request merges changes from the template repository, overwriting or removing the following files:${file_list}" --head "$pr_branch" --base "$branch_name"
