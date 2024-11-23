@@ -13,6 +13,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     steps:
@@ -27,6 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.PAT }} # Personal Access Token (PAT) with repo scope
 
       - name: Get GitHub App token
         uses: tibdex/github-app-token@v1.7.0
@@ -34,12 +36,13 @@ jobs:
         with:
           app_id: ${{ secrets.APP_ID }}
           private_key: ${{ secrets.APP_PRIVATE_KEY }}
-
+          
       - name: Sync branch to template
         env:
           GH_TOKEN: ${{ steps.get_installation_token.outputs.token }}
-          WHITELIST_FILES: ".github/workflows/sync-template.yml .github/workflows/build.yml .github/workflows/conventional-commits.yml .github/workflows/cspell.yml .github/workflows/cypress-testing.yml .github/workflows/knip-reporter.yml .github/workflows/knip.yml .github/workflows/no-empty-strings.yml .github/workflows/release-please.yml .github/pull_request_template.md .husky/ .eslintrc .nvmrc .prettierrc .yarnrc.yml tsconfig.json"
+          WHITELIST_FILES: ".github/ .husky/ .eslintrc .nvmrc .prettierrc .yarnrc.yml tsconfig.json"
           ADDITIONAL_FILES: ${{ github.event.inputs.additional_files }}
+          BLACKLIST_FILES: ".github/workflows/deploy.yml"
         run: |
           branch_name=$(git rev-parse --abbrev-ref HEAD)
           original_remote=$(git remote get-url origin)
@@ -52,7 +55,7 @@ jobs:
             echo "Branch $pr_branch already exists. Fetching and updating."
             git fetch origin "$pr_branch"
             git checkout "$pr_branch"
-            git rebase "origin/$pr_branch"
+            git rebase "origin/$branch_name"
           else
             echo "Creating new branch $pr_branch."
             git checkout -b "$pr_branch"
@@ -60,34 +63,73 @@ jobs:
 
           git clone https://github.com/ubiquity/ts-template template-repo
 
-          # Convert ADDITIONAL_FILES input to an array
+          # Convert WHITELIST_FILES to array
+          whitelist_files=()
+          IFS=' ' read -r -a whitelist_files <<< "$WHITELIST_FILES"
+
+          # Convert ADDITIONAL_FILES inputs to array
           additional_files=()
           if [[ -n "$ADDITIONAL_FILES" ]]; then
             IFS=',' read -r -a additional_files <<< "$ADDITIONAL_FILES"
           fi
 
+          # Convert BLACKLIST_FILES to array
+          blacklist_files=()
+          if [[ -n "$BLACKLIST_FILES" ]]; then
+            IFS=',' read -r -a blacklist_files <<< "$BLACKLIST_FILES"
+            echo "Blacklist files: ${blacklist_files[@]}"
+          fi
+
           # Prepare file list for the PR body and process each whitelist file
           file_list=""
-          for file in $WHITELIST_FILES "${additional_files[@]}"; do
-            if [[ -e "template-repo/$file" ]]; then
-              cp -rf "template-repo/$file" "$file"
-              file_list+="\n- \`${file}\`"
+          for file in "${whitelist_files[@]}" "${additional_files[@]}"; do
+            if [[ -d "template-repo/$file" ]]; then
+              echo "Processing directory: $file"
+              mkdir -p "$file"
+              rsync -a --delete "template-repo/$file/" "$file/"
+              file_list+=$'\n'"- \`${file}\` (directory)"
+            elif [[ -e "template-repo/$file" ]]; then
+              echo "Processing file: $file"
+              cp -f "template-repo/$file" "$file"
+              file_list+=$'\n'"- \`${file}\`"
             else
-              # Remove file from destination if not in template
+              echo "Removing missing file or directory: $file"
               rm -rf "$file"
-              file_list+="\n- \`${file}\` (removed)"
+              file_list+=$'\n'"- \`${file}\` (removed)"
+            fi
+          done
+
+          # Check for blacklisted files and revert changes
+          echo "Checking for blacklisted files..."
+          for blacklisted in "${blacklist_files[@]}"; do
+            if [[ -e "$blacklisted" ]]; then
+              echo "Reverting blacklisted file or directory: $blacklisted"
+              git rm -rf --cached "$blacklisted" || rm -rf "$blacklisted"
             fi
           done
 
           # Clean up
           rm -rf template-repo/
 
-          # Commit
+          # Commit changes
           git add .
-          git commit -m "chore: sync template"
-          
-          # Push
+          git commit -m "chore: sync template" || echo "No changes to commit."
+
+          # Push changes to the remote repository
           git push "$original_remote" "$pr_branch"
 
-          # Create PR
-          gh pr create --title "Sync branch to template" --body "This pull request merges changes from the template repository, overwriting or removing the following files:${file_list}" --head "$pr_branch" --base "$branch_name"
+          # Check for existing pull requests
+          existing_pr=$(gh pr list --base "$branch_name" --head "$pr_branch" --state open --json id --jq '.[0].id')
+
+          # Include blacklist info in PR body if present
+          if [[ -n "$blacklist_list" ]]; then
+            file_list+=$'\n\n**Blacklisted Files**:'"$blacklist_list"
+          fi
+          
+          # Create or update the pull request
+          if [[ -z "$existing_pr" ]]; then
+            gh pr create --title "Sync branch to template" --body "This pull request merges changes from the template repository, overwriting or removing the following files:${file_list}" --head "$pr_branch" --base "$branch_name"
+          else
+            gh pr edit "$existing_pr" --body "This pull request merges changes from the template repository, overwriting or removing the following files:${file_list}"
+            echo "Updated the existing pull request #$existing_pr."
+          fi
