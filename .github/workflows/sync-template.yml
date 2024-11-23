@@ -1,45 +1,9 @@
-name: Sync branch to template
-
-on:
-  workflow_dispatch:
-    inputs:
-      additional_files:
-        description: 'Comma-separated list of extra paths to sync, for example: .eslintrc,.prettierrc,.github'
-        required: false
-  schedule:
-    - cron: '14 0 1 * *'
-
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - name: Check if repository is ts-template
-        run: |
-          if [[ "${{ github.repository }}" == "ubiquity/ts-template" ]]; then
-            echo "Skipping sync: this is the template repository."
-            exit 0
-          fi
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Get GitHub App token
-        uses: tibdex/github-app-token@v1.7.0
-        id: get_installation_token
-        with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PRIVATE_KEY }}
-
       - name: Sync branch to template
         env:
           GH_TOKEN: ${{ steps.get_installation_token.outputs.token }}
-          WHITELIST_FILES: ".github/workflows/sync-template.yml .github/workflows/build.yml .github/workflows/conventional-commits.yml .github/workflows/cspell.yml .github/workflows/cypress-testing.yml .github/workflows/knip-reporter.yml .github/workflows/knip.yml .github/workflows/no-empty-strings.yml .github/workflows/release-please.yml .github/pull_request_template.md .husky/ .eslintrc .nvmrc .prettierrc .yarnrc.yml tsconfig.json"
+          WHITELIST_FILES: ".github/ .husky/ .eslintrc .nvmrc .prettierrc .yarnrc.yml tsconfig.json"
           ADDITIONAL_FILES: ${{ github.event.inputs.additional_files }}
+          BLACKLIST_FILES: ".github/workflows/deploy.yml"
         run: |
           branch_name=$(git rev-parse --abbrev-ref HEAD)
           original_remote=$(git remote get-url origin)
@@ -60,18 +24,29 @@ jobs:
 
           git clone https://github.com/ubiquity/ts-template template-repo
 
-          # Convert ADDITIONAL_FILES input to an array
+          # Convert ADDITIONAL_FILES inputs to array
           additional_files=()
           if [[ -n "$ADDITIONAL_FILES" ]]; then
             IFS=',' read -r -a additional_files <<< "$ADDITIONAL_FILES"
+          fi
+
+          # Convert BLACKLIST_FILES to array
+          blacklist_files=()
+          if [[ -n "$BLACKLIST_FILES" ]]; then
+            IFS=',' read -r -a blacklist_files <<< "$BLACKLIST_FILES"
           fi
 
           # Prepare file list for the PR body and process each whitelist file
           file_list=""
           for file in $WHITELIST_FILES "${additional_files[@]}"; do
             if [[ -e "template-repo/$file" ]]; then
-              cp -rf "template-repo/$file" "$file"
-              file_list+="\n- \`${file}\`"
+              # Skip file if they match the blacklist
+              if [[ ! " ${blacklist_files[@]} " =~ " ${file} " ]]; then
+                cp -rf "template-repo/$file" "$file"
+                file_list+="\n- \`${file}\`"
+              else
+                echo "Skipping blacklisted file: $file"
+              fi
             else
               # Remove file from destination if not in template
               rm -rf "$file"
