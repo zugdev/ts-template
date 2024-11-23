@@ -42,7 +42,7 @@ jobs:
           GH_TOKEN: ${{ steps.get_installation_token.outputs.token }}
           WHITELIST_FILES: ".github/ .husky/ .eslintrc .nvmrc .prettierrc .yarnrc.yml tsconfig.json"
           ADDITIONAL_FILES: ${{ github.event.inputs.additional_files }}
-          BLACKLIST_FILES: ".github/workflows/deploy.yml"
+          BLACKLIST_FILES: ".github/workflows/sync-template.yml"
         run: |
           branch_name=$(git rev-parse --abbrev-ref HEAD)
           original_remote=$(git remote get-url origin)
@@ -117,6 +117,10 @@ jobs:
 
           # Push changes to the remote repository
           git push "$original_remote" "$pr_branch"
+
+          # Debug PR listing
+          echo "PR Branch: $pr_branch"
+          echo "Base Branch: $branch_name"
 
           # Check for existing pull requests
           existing_pr=$(gh pr list --base "$branch_name" --head "$pr_branch" --state open --json id --jq '.[0].id')
