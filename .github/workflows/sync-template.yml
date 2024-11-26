@@ -61,7 +61,7 @@ jobs:
             git checkout -b "$pr_branch"
           fi
 
-          git clone https://github.com/ubiquity/ts-template template-repo
+          git clone https://github.com/zugdev/ts-template template-repo
 
           # Convert WHITELIST_FILES to array
           whitelist_files=()
@@ -104,7 +104,7 @@ jobs:
           for blacklisted in "${blacklist_files[@]}"; do
             if [[ -e "$blacklisted" ]]; then
               echo "Reverting blacklisted file or directory: $blacklisted"
-              git rm -rf --cached "$blacklisted" || rm -rf "$blacklisted"
+              git restore "$blacklisted"
             fi
           done
 
