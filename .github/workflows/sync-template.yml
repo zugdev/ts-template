@@ -40,7 +40,7 @@ jobs:
       - name: Sync branch to template
         env:
           GH_TOKEN: ${{ steps.get_installation_token.outputs.token }}
-          WHITELIST_FILES: ".github/ .husky/ .eslintrc .nvmrc .prettierrc .yarnrc.yml tsconfig.json"
+          WHITELIST_FILES: ".github/ .husky/ .eslintrc .nvmrc .prettierrc .yarnrc.yml tsconfig.json static/index.html"
           ADDITIONAL_FILES: ${{ github.event.inputs.additional_files }}
           BLACKLIST_FILES: ".github/workflows/sync-template.yml"
         run: |
