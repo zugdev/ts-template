@@ -90,6 +90,7 @@ jobs:
               file_list+=$'\n'"- \`${file}\` (directory)"
             elif [[ -e "template-repo/$file" ]]; then
               echo "Processing file: $file"
+              mkdir -p "$file"
               cp -f "template-repo/$file" "$file"
               file_list+=$'\n'"- \`${file}\`"
             else
