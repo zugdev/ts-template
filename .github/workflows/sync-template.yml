@@ -131,6 +131,6 @@ jobs:
           if [[ -z "$existing_pr" ]]; then
             gh pr create --title "Sync branch to template" --body "This pull request merges changes from the template repository, overwriting or removing the following files:${file_list}" --head "$pr_branch" --base "$branch_name"
           else
-            gh pr edit "$existing_pr" --body "This pull request merges changes from the template repository, overwriting or removing the following files:${file_list}"
+            gh pr edit "$pr_branch" --body "This pull request merges changes from the template repository, overwriting or removing the following files:${file_list}"
             echo "Updated the existing pull request #$existing_pr."
           fi
