@@ -116,8 +116,8 @@ jobs:
           git add .
           git commit -m "chore: sync template" || echo "No changes to commit."
 
-          # Push changes to the remote repository
-          git push "$original_remote" "$pr_branch"
+          # Push changes to the remote repository (force is to be incremental)
+          git push "$original_remote" "$pr_branch" --force
 
           # Check for existing pull requests
           existing_pr=$(gh pr list --base "$branch_name" --head "$pr_branch" --state open --json id --jq '.[0].id')
