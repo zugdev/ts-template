@@ -13,7 +13,7 @@ const excludedFiles: string[] = process.env.EXCLUDED_FILES
   : [];
 
 if (!token || !owner || !repo || pullNumber === "0" || !baseRef) {
-  core.setFailed("Missing required environment variables.");
+  core.setFailed("Missing required environment variables." + owner.toString() + repo.toString() + pullNumber.toString() + baseRef?.toString());
   process.exit(1);
 }
 
